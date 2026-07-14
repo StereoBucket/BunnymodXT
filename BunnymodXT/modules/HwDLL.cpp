@@ -363,6 +363,11 @@ extern "C" void __cdecl LoadThisDll(const char *szDllFilename)
 {
 	return HwDLL::HOOKED_LoadThisDll(szDllFilename);
 }
+
+extern "C" void __cdecl GL_RSURF_R_TextureAnimation(msurface_t* s)
+{
+	return HwDLL:HOOKED_GL_RSURF_R_TextureAnimation(s);
+}
 #endif
 
 void HwDLL::Hook(const std::wstring& moduleName, void* moduleHandle, void* moduleBase, size_t moduleLength, bool needToIntercept)
@@ -480,6 +485,7 @@ void HwDLL::Hook(const std::wstring& moduleName, void* moduleHandle, void* modul
 			MemUtils::MarkAsExecutable(ORIG_ReleaseEntityDlls);
 			MemUtils::MarkAsExecutable(ORIG_ValidStuffText);
 			MemUtils::MarkAsExecutable(ORIG_CL_ReadDemoMessage_OLD);
+			MemUtils::MarkAsExecutable(ORIG_GL_RSURF_R_TextureAnimation);
 			MemUtils::MarkAsExecutable(ORIG_NLoadBlobFileClient);
 			MemUtils::MarkAsExecutable(ORIG_LoadThisDll);
 		}
@@ -538,6 +544,7 @@ void HwDLL::Hook(const std::wstring& moduleName, void* moduleHandle, void* modul
 			ORIG_R_StudioRenderModel, HOOKED_R_StudioRenderModel,
 			ORIG_R_SetFrustum, HOOKED_R_SetFrustum,
 			ORIG_SPR_Set, HOOKED_SPR_Set,
+			ORIG_GL_RSURF_R_TextureAnimation, HOOKED_GL_RSURF_R_TextureAnimation,
 			ORIG_DrawCrosshair, HOOKED_DrawCrosshair,
 			ORIG_Draw_FillRGBA, HOOKED_Draw_FillRGBA,
 			ORIG_PF_traceline_DLL, HOOKED_PF_traceline_DLL,
@@ -642,7 +649,8 @@ void HwDLL::Unhook()
 			ORIG_ValidStuffText,
 			ORIG_CL_ReadDemoMessage_OLD,
 			ORIG_Host_Shutdown,
-			ORIG_LoadThisDll);
+			ORIG_LoadThisDll,
+			ORIG_GL_RSURF_R_TextureAnimation);
 	}
 
 	for (auto cvar : CVars::allCVars)
@@ -746,6 +754,7 @@ void HwDLL::Clear()
 	ORIG_ValidStuffText = nullptr;
 	ORIG_CL_ReadDemoMessage_OLD = nullptr;
 	ORIG_LoadThisDll = nullptr;
+	ORIG_GL_RSURF_R_TextureAnimation = nullptr;
 
 	ClientDLL::GetInstance().pEngfuncs = nullptr;
 	ServerDLL::GetInstance().pEngfuncs = nullptr;
@@ -753,6 +762,7 @@ void HwDLL::Clear()
 	pEngStudio = nullptr;
 	pEngineAPI = nullptr;
 
+	gl_rtable = nullptr;
 	registeredVarsAndCmds = false;
 	autojump = false;
 	ducktap = false;
@@ -2047,6 +2057,18 @@ void HwDLL::FindStuff()
 				}
 			});
 
+		auto fGL_RSURF_R_TextureAnimation = FindAsync(
+			ORIG_GL_RSURF_R_TextureAnimation,
+			patterns::engine::GL_RSURF_R_TextureAnimation,
+			[&](auto pattern) {
+				switch (pattern - patterns::engine::GL_RSURF_R_TextureAnimation.cbegin())
+				{
+				default:
+				case 0: // WON.
+					gl_rtable = *reinterpret_cast<int(**)[20]>(reinterpret_cast<uintptr_t>(ORIG_GL_RSURF_R_TextureAnimation) + 15);
+				}
+			});
+
 		{
 			auto pattern = fClientDLL_CheckStudioInterface.get();
 			if (ClientDLL_CheckStudioInterface) {
@@ -2324,6 +2346,18 @@ void HwDLL::FindStuff()
 			}
 		}
 
+
+		{
+			auto pattern = fGL_RSURF_R_TextureAnimation.get();
+			if (ORIG_GL_RSURF_R_TextureAnimation) {
+				EngineDevMsg("[hw dll] Found the R_TextureAnimation pattern at %p (using the %s pattern).\n", ORIG_GL_RSURF_R_TextureAnimation, pattern->name());
+				EngineDevMsg("[hw dll] Found gl_rtable at %p.\n", gl_rtable);
+			}
+			else {
+				EngineDevWarning("[hw dll] Could not find the R_TextureAnimation pattern.\n");
+			}
+		}
+
 		#define GET_FUTURE(future_name) \
 			{ \
 				auto pattern = f##future_name.get(); \
@@ -2418,6 +2452,7 @@ void HwDLL::FindStuff()
 		GET_FUTURE(ValidStuffText);
 		GET_FUTURE(CL_ReadDemoMessage_OLD);
 		GET_FUTURE(NLoadBlobFileClient)
+		//GET_FUTURE(GL_RSURF_R_TextureAnimation)
 
 		if (oldEngine) {
 			GET_FUTURE(LoadAndDecryptHwDLL);
@@ -8440,4 +8475,45 @@ HOOK_DEF_1(HwDLL, void, __cdecl, LoadThisDll, const char*, szDllFilename)
 	}
 
 	ORIG_LoadThisDll(szDllFilename);
+}
+
+HOOK_DEF_1(HwDLL, texture_t*, __cdecl, GL_RSURF_R_TextureAnimation, msurface_t*, s)
+{
+	static const int rtable[20][20] = {
+	{ 1630, 2723, 2341, 227, 534, 916, 2865, 356, 1445, 2401, 780, 2919, 3136, 2817, 770, 496, 338, 2106, 2607, 2420 },
+	{ 951, 2377, 3087, 2028, 595, 444, 3128, 1635, 2979, 3341, 1707, 1580, 2947, 299, 88, 433, 2364, 73, 774, 1361 },
+	{ 418, 1919, 430, 3347, 2211, 1829, 1942, 118, 2595, 2530, 1669, 2043, 3326, 637, 2126, 1487, 2005, 1086, 13, 1734 },
+	{ 2407, 1413, 3095, 2829, 2314, 1470, 536, 207, 604, 2233, 1398, 679, 1950, 1951, 603, 2686, 297, 2195, 9, 728 },
+	{ 318, 2777, 2214, 2611, 3282, 1256, 1422, 3031, 3225, 404, 955, 641, 751, 2885, 1468, 2589, 2375, 522, 587, 2365 },
+	{ 3257, 1240, 1531, 2298, 1876, 2893, 2132, 841, 260, 254, 3132, 2026, 929, 2756, 2739, 68, 3206, 2833, 1647, 2421 },
+	{ 1494, 1831, 77, 2103, 522, 14, 3145, 39, 2828, 736, 473, 1874, 1225, 234, 775, 1842, 1396, 669, 2693, 2566 },
+	{ 2225, 1424, 2026, 2315, 1669, 732, 1419, 2645, 2670, 1707, 3175, 1457, 154, 890, 237, 2528, 1942, 3124, 815, 3268 },
+	{ 1730, 1330, 817, 1521, 590, 1553, 1987, 2254, 1385, 3176, 1134, 2284, 227, 2775, 1372, 367, 1569, 437, 2100, 3233 },
+	{ 2373, 1126, 738, 2245, 316, 963, 2273, 860, 1459, 1242, 2176, 1097, 1080, 1208, 2491, 2052, 2610, 1964, 151, 1856 },
+	{ 704, 2625, 275, 1074, 407, 2265, 2551, 330, 312, 811, 375, 246, 83, 1665, 1314, 808, 1811, 766, 1053, 1360 },
+	{ 456, 2259, 1010, 3007, 3341, 2599, 3153, 2824, 1931, 2255, 468, 2647, 1674, 1027, 2662, 2393, 1558, 497, 2539, 2057 },
+	{ 2029, 2030, 139, 233, 1600, 224, 1665, 2150, 2233, 702, 2921, 2574, 327, 2393, 156, 1266, 2614, 2393, 722, 2325 },
+	{ 651, 3022, 1815, 1783, 1796, 3111, 842, 2068, 2717, 2888, 2587, 1272, 3041, 1050, 1565, 1783, 105, 2659, 773, 2396 },
+	{ 2291, 2313, 814, 2385, 1011, 1730, 2685, 456, 2234, 117, 2423, 1648, 2175, 3245, 423, 933, 1210, 1221, 2182, 2446 },
+	{ 2020, 1646, 1698, 437, 3240, 1092, 2303, 1054, 1377, 59, 285, 977, 874, 2432, 1089, 515, 2388, 2667, 2465, 467 },
+	{ 856, 579, 776, 2459, 3097, 1458, 301, 1127, 1268, 3016, 1262, 2904, 2735, 978, 2111, 2782, 2594, 1633, 2724, 1305 },
+	{ 2559, 3056, 1993, 1852, 708, 721, 1280, 2830, 1701, 2537, 678, 1481, 880, 3310, 2316, 2549, 732, 1452, 3106, 2287 },
+	{ 3106, 729, 1324, 2862, 2996, 2823, 886, 867, 3074, 2968, 1399, 2778, 1744, 1767, 103, 705, 22, 341, 2328, 260 },
+	{ 3336, 467, 2052, 1564, 2234, 2026, 1583, 1928, 9, 3084, 2093, 256, 1262, 1483, 974, 3311, 3295, 1658, 2164, 249 }
+	};
+
+	texture_t* t = ORIG_GL_RSURF_R_TextureAnimation(s);
+	if (!rtable_initialized)
+	{
+		rtable_initialized = true;
+		for (int tu = 0; tu < 20; tu++)
+		{
+			for (int tv = 0; tv < 20; tv++)
+			{
+				gl_rtable[tu][tv] = rtable[tu][tv];
+				
+			}
+		}
+	}
+	return t;
 }

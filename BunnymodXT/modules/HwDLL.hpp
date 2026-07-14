@@ -87,6 +87,7 @@ class HwDLL : public IHookableNameFilterOrdered
 	HOOK_DECL(qboolean, __cdecl, ValidStuffText, char* buf)
 	HOOK_DECL(qboolean, __cdecl, CL_ReadDemoMessage_OLD)
 	HOOK_DECL(void, __cdecl, LoadThisDll, const char* szDllFilename)
+	HOOK_DECL(texture_t*, __cdecl, GL_RSURF_R_TextureAnimation, msurface_t* s)
 
 	struct Key
 	{
@@ -324,6 +325,8 @@ public:
 
 	bool is_cstrike_dir = false;
 	bool is_tfc_dir = false;
+
+	bool rtable_initialized = false;
 
 	globalvars_t *ppGlobals;
 	engine_studio_api_t *pEngStudio;
@@ -791,4 +794,7 @@ public:
 
 protected:
 	void **g_sv_delta;
+
+public:
+	int  (*gl_rtable)[20] = nullptr; //[20][20]
 };
