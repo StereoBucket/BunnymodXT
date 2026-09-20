@@ -356,9 +356,9 @@ namespace TriangleDrawing
 		}
 	}
 
-	static void DrawBrushEntAbsMinMax(triangleapi_s* pTriAPI)
+	static void DrawPushBrushEntAbsMinMax(triangleapi_s* pTriAPI)
 	{
-		if (!CVars::bxt_show_brush_bbox.GetBool())
+		if (!CVars::bxt_show_push_bbox.GetBool())
 			return;
 
 		pTriAPI->CullFace(TRI_NONE);
@@ -377,13 +377,18 @@ namespace TriangleDrawing
 			if (!hw.IsValidEdict(ent)) {
 				continue;
 			}
-
-			if (ent->v.solid != SOLID_NOT && hw.GetString(ent->v.model)[0] == '*')
+			
+			if ( ent->v.solid == SOLID_BSP && ent->v.movetype == MOVETYPE_PUSH && !(ent->v.flags & FL_WORLDBRUSH))
 			{
+				const char* classname = HwDLL::GetInstance().GetString(ent->v.classname);
+				bool is_breakable = std::strncmp(classname, "func_breakable", 14) == 0;
+				if (is_breakable) {
+					continue;
+				}
 				pTriAPI->RenderMode(kRenderTransColor);
 				pTriAPI->Color4f(1.0f, 0.75f, 0.8f, 1.0f);
 				TriangleUtils::DrawAACuboidWireframe(pTriAPI, ent->v.absmin, ent->v.absmax);
-				if (CVars::bxt_show_brush_bbox.GetInt() == 2) {
+				if (CVars::bxt_show_push_bbox.GetInt() >= 2) {
 					pTriAPI->RenderMode(kRenderTransAdd);
 					pTriAPI->Color4f(1.0f, 0.75f, 0.8f, 0.1f);
 					TriangleUtils::DrawAACuboid(pTriAPI, ent->v.absmin, ent->v.absmax);
@@ -2428,7 +2433,7 @@ namespace TriangleDrawing
 		DrawAbsMinMax(pTriAPI);
 		DrawPlayerAbsMinMax(pTriAPI);
 		DrawMonsterAbsMinMax(pTriAPI);
-		DrawBrushEntAbsMinMax(pTriAPI);
+		DrawPushBrushEntAbsMinMax(pTriAPI);
 		DrawBulletsEnemyTrace(pTriAPI);
 		DrawBulletsPlayerTrace(pTriAPI);
 		DrawSplits(pTriAPI);
